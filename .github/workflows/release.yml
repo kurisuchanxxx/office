@@ -6,29 +6,11 @@ name: Release
 #
 # Pull requests get the same build, tests and a real install of the packed release through
 # install.sh, but publish nothing.
+#
+# Ctrl Studio copy: only by hand. This is upstream's publishing pipeline; on a push here it would
+# spend our Actions minutes and cut releases nobody installs (install.sh points at upstream).
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'bin/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig*.json'
-      - 'vite.config.ts'
-      - '.github/workflows/release.yml'
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'bin/**'
-      - 'tests/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig*.json'
-      - 'vite.config.ts'
-      - 'install.sh'
-      - '.github/workflows/release.yml'
   workflow_dispatch:
 
 permissions:
