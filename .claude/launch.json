@@ -1,0 +1,16 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "office",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User') + ';' + $env:Path; node bin/agent-office.js --host 127.0.0.1 --port 4600 --no-open"
+      ],
+      "port": 4600,
+      "url": "http://127.0.0.1:4600"
+    }
+  ]
+}
