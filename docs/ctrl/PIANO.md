@@ -30,7 +30,8 @@ Comando usato: `node --import tsx --import=#tests/css --test --test-force-exit -
 
 - **Programmi finti scritti per la shell** (`#!/bin/sh`, senza estensione o `.cmd`): il finto `gh` di `clone.test.ts` e `repos.test.ts`, i finti agenti di `workers.test.ts` (lo stato non arriva mai), `office-workers` e `office-queue` non trovati, uno `spawn EINVAL`. Sono la maggior parte.
 - **Cartelle temporanee che Windows non lascia cancellare** mentre un processo le tiene aperte (`dsh.test.ts`, `EPERM`).
-- **Fine riga CRLF**: Git per Windows qui scarica i file con CRLF (`core.autocrlf=true`, `.gitattributes` fissa LF solo per `*.sh`), e `client-registry.test.ts` e `maps.test.ts` leggono i sorgenti con espressioni che si aspettano LF.
+- **Fine riga CRLF**: Git per Windows qui scarica i file con CRLF (`core.autocrlf=true`, `.gitattributes` fissa LF solo per `*.sh`), e `maps.test.ts` confronta `docs/maps/castle.json` e `docs/maps.md` con testo a LF (su una copia convertita a LF passano).
+- **Barre rovesciate nei percorsi**: `client-registry.test.ts` confronta `file === 'world/types.ts'`, ma su Windows arriva `world\types.ts` (verificato: con il confronto corretto e i sorgenti a LF passa tutto, compreso il tipo `flotta`).
 - **Collegamenti simbolici**: `codex-usage.test.ts` crea un symlink, che su Windows richiede la modalita' sviluppatore o l'amministratore.
 
 Il controllo di sicurezza che rifiuta un file fuori dalla cartella passando da una junction (`changes.test.ts`) invece passa. Per i prossimi aggiornamenti: si confrontano i fallimenti con questo elenco, e conta solo quello che e' nuovo.
@@ -76,7 +77,10 @@ Obiettivo: i 18 agenti della Flotta seduti alle scrivanie, con lo stato vero pre
 
 - `chiave`, `nome`, `sezione` (`sorveglianza`, `produzione`, `contatto`), `href` (la pagina dell'agente nel gestionale);
 - `coda`: quante cose aspettano una persona, da `codeAgenti()` in `web/lib/flotta-stato.ts` (lo stesso numero che mostra `/flotta`, cosi' i due non raccontano cose diverse);
-- `ultimoRun`: `ok`, `created_at`, `messaggio` dall'ultima riga di `agent_runs` per quella chiave.
+- `ultimoRun`: `ok`, `created_at`, `messaggio` dall'ultima riga di `agent_runs` per quella chiave (`null` se non ha mai girato);
+- `codaLabel`: che cosa c'e' in coda, gia' scritto in `AGENTI` («bozze da rivedere»), per il cartellino sopra la testa.
+
+La risposta e' `{ "agenti": [ ... ] }`. L'ufficio scarta gli agenti con campi mancanti, una sezione sconosciuta o un `href` che non comincia con `/` (`parseFleet` in `src/server/ctrl/flotta.ts`).
 
 Niente dati di clienti o lead: solo nomi di agenti e numeri. In ctrlOS questo e' «collegare pezzi che ci sono gia'», non una sezione nuova.
 
@@ -87,6 +91,22 @@ Niente dati di clienti o lead: solo nomi di agenti e numeri. In ctrlOS questo e'
 - un clic (o **E**) apre la pagina `href` dell'agente in ctrlOS, perche' l'azione si fa li'.
 
 La parte da studiare per prima: oggi un lavoratore dell'ufficio e' sempre un terminale. Va capito come mettere alla scrivania un lavoratore senza terminale (partire da `src/client/features/workers/`, `src/server/workers/` e da come un piano e' legato a una cartella in `src/server/floor.ts`), senza riscrivere i file dell'originale.
+
+### Dove siamo (9 ottobre 2026): il lato ufficio, con dati finti
+
+Fatto, senza toccare ctrlOS. Il piano Flotta si vede con dati di prova finche' la rotta non c'e'.
+
+- **Dove siedono.** Su un piano tutto loro, alle scrivanie del piano stesso (l'ufficio 3D e' uno solo per tutti i piani, e non c'e' posto per altre 18 scrivanie accanto a quelle dei lavoratori): Produzione (8) nelle due isole a nord (`desk-1…8`), Contatto e incassi (6) in quelle a sud (`desk-9…14`), Sorveglianza (4) nell'ala sul retro (`desk-17…20`). Un cartello col nome della sezione per ogni coppia di scrivanie, nei colori verde, arancio e blu. Al primo collegamento il server allarga l'ala di due file e appende i cartelli che mancano (non tocca quelli messi da qualcuno).
+- **Come appaiono.** Personaggi da lavoratore col portatile, non lavoratori: niente terminale, nessun abbonamento consumato. Rosso e saltellanti con «🙋 NEEDS YOU» quando `coda > 0` o l'ultima corsa e' fallita (col motivo nel cartellino), «✅ DONE» e un salto per 3 minuti dopo una corsa andata bene, «💤» se non girano da 30 giorni, «💬 READY» altrimenti. **E** vicino a un agente apre la sua pagina in ctrlOS; le scrivanie dove siedono non offrono di assumere, quelle libere si'.
+- **I file**, tutti nostri: `src/shared/ctrl/flotta.ts` (posti, cartelli, aspetto), `src/shared/protocol/ctrl.ts` (i messaggi `flotta.hello` e `flotta`), `src/server/ctrl/` (`flotta.ts` legge la rotta, `demo.ts` i dati finti, `handlers.ts` i messaggi e i cartelli), `src/client/features/ctrl/` (`fleet.ts` i personaggi, `index.ts` l'installazione), `tests/ctrl-flotta.test.ts` (10 test). Nei file dell'originale solo le righe di registrazione: `protocol.ts` (4 righe), `ws/handlers/index.ts` (2), `main.ts` (2).
+- **Le variabili d'ambiente**, tutte facoltative: `CTRL_FLOTTA_URL` (la rotta; senza, dati finti), `CTRL_FLOTTA_TOKEN` (il suo token), `CTRL_FLOTTA_FLOOR` (il piano, per nome o `owner/repo`; di base `flotta`), `CTRL_BASE_URL` (l'indirizzo di ctrlOS per i link; di base quello della rotta, se no `https://ctrlos.vercel.app`).
+- **Verificato** su un ufficio di prova separato (porta 4610, cartella sua): screenshot dall'alto e in prospettiva, suggerimento e link aperto con **E** su tre agenti, scrivania libera che offre ancora di assumere. Typecheck e build passano; la suite su Windows ha gli stessi 57 fallimenti di prima e i 10 test nuovi passano.
+
+Resta aperto:
+
+- **Il piano «flotta» vero.** Nell'ufficio di Christian non c'e' ancora; una volta creato si vede da solo, coi dati finti. Le strade: (a) una repo privata quasi vuota `kurisuchanxxx/flotta`, aggiunta come gli altri piani (la strada normale dell'ufficio; le sue bacheche restano vuote); (b) una cartella locale con la voce scritta a mano in `floors.json` (niente GitHub, ma strada non documentata); (c) nessun piano nuovo, con `CTRL_FLOTTA_FLOOR=ctrlos`: gli agenti occupano le scrivanie del piano ctrlos, e un lavoratore Claude assunto li' passa davanti all'agente di quella scrivania. Christian ha scelto la (a) il 9 ottobre; tre piani, uno per sezione, sono stati scartati per ora (la Flotta va vista tutta insieme, e sarebbero tre repo vuote con piani semivuoti). La repo non e' ancora creata: quel giorno GitHub non era raggiungibile da questo computer.
+- **La rotta in ctrlOS**, quando Christian lo decide: con lei si impostano `CTRL_FLOTTA_URL` e `CTRL_FLOTTA_TOKEN` (il token come variabile d'ambiente del computer, mai in `launch.json`).
+- `1 bozze da rivedere`: il cartellino usa il `codaLabel` di ctrlOS cosi' com'e', anche al singolare.
 
 ## Passo 3: dentro ctrlOS (dopo il 15 ottobre, solo se i numeri dicono si')
 
